@@ -1,5 +1,15 @@
 {
   "dependencies": {
+    "com.emeryporter.unitymcp": {
+      "version": "https://github.com/emeryporter/UnityMCP.git?path=/Package",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.unity.nuget.newtonsoft-json": "3.2.2",
+        "com.unity.ugui": "1.0.0"
+      },
+      "hash": "846caa5b15fe9758c4ed0caa60022b80c1c81229"
+    },
     "com.unity.ai.navigation": {
       "version": "2.0.12",
       "depth": 0,
@@ -89,6 +99,13 @@
     "com.unity.nuget.mono-cecil": {
       "version": "1.11.6",
       "depth": 3,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://packages.unity.com"
+    },
+    "com.unity.nuget.newtonsoft-json": {
+      "version": "3.2.2",
+      "depth": 1,
       "source": "registry",
       "dependencies": {},
       "url": "https://packages.unity.com"
