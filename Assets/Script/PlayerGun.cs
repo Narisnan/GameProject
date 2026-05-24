@@ -15,6 +15,7 @@ public class PlayerGun : MonoBehaviour
 
     PlayerInputActions inputProvider;
     InputAction attackAction;
+    bool usesSharedInputAsset;
     float nextFireTime;
 
     void Awake()
@@ -34,19 +35,27 @@ public class PlayerGun : MonoBehaviour
         inputProvider = GetComponent<PlayerInputActions>();
         var map = inputProvider.PlayerMap;
         if (map != null)
+        {
+            usesSharedInputAsset = true;
             attackAction = map.FindAction("Attack");
+        }
         else
+        {
+            usesSharedInputAsset = false;
             attackAction = CreateFallbackAttackAction();
+        }
     }
 
     void OnEnable()
     {
-        attackAction?.Enable();
+        if (!usesSharedInputAsset)
+            attackAction?.Enable();
     }
 
     void OnDisable()
     {
-        attackAction?.Disable();
+        if (!usesSharedInputAsset)
+            attackAction?.Disable();
     }
 
     void Update()

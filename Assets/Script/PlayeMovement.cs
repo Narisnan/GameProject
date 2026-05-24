@@ -7,7 +7,7 @@ public class PlayeMovement : MonoBehaviour
 {
     [SerializeField] float moveSpeed = 6f;
     [SerializeField] float jumpForce = 7f;
-    [SerializeField] float groundCheckDistance = 0.25f;
+    [SerializeField] float groundedRememberTime = 0.15f;
     [SerializeField] LayerMask groundMask = ~0;
     [SerializeField] bool cameraRelative = true;
 
@@ -15,6 +15,9 @@ public class PlayeMovement : MonoBehaviour
     PlayerInputActions inputProvider;
     InputAction moveAction;
     InputAction jumpAction;
+    bool usesSharedInputAsset;
+    bool jumpQueued;
+    float lastGroundedTime = float.NegativeInfinity;
 
     void Awake()
     {
@@ -26,56 +29,89 @@ public class PlayeMovement : MonoBehaviour
 
         if (map != null)
         {
+            usesSharedInputAsset = true;
             moveAction = map.FindAction("Move");
             jumpAction = map.FindAction("Jump");
         }
         else
         {
+            usesSharedInputAsset = false;
             moveAction = CreateFallbackMoveAction();
             jumpAction = CreateFallbackJumpAction();
         }
-
-        if (jumpAction != null)
-            jumpAction.performed += OnJump;
-    }
-
-    void OnDestroy()
-    {
-        if (jumpAction != null)
-            jumpAction.performed -= OnJump;
     }
 
     void OnEnable()
     {
-        moveAction?.Enable();
-        jumpAction?.Enable();
+        if (!usesSharedInputAsset)
+        {
+            moveAction?.Enable();
+            jumpAction?.Enable();
+        }
     }
 
     void OnDisable()
     {
-        moveAction?.Disable();
-        jumpAction?.Disable();
+        if (!usesSharedInputAsset)
+        {
+            moveAction?.Disable();
+            jumpAction?.Disable();
+        }
     }
 
-    void OnJump(InputAction.CallbackContext _)
+    void Update()
     {
-        if (!IsGrounded())
+        if (WasJumpPressed())
+            jumpQueued = true;
+    }
+
+    bool WasJumpPressed()
+    {
+        if (jumpAction != null && jumpAction.WasPressedThisFrame())
+            return true;
+
+        return Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame;
+    }
+
+    void OnCollisionStay(Collision collision)
+    {
+        if (!IsValidGroundCollision(collision))
             return;
 
-        Vector3 velocity = rb.linearVelocity;
-        velocity.y = jumpForce;
-        rb.linearVelocity = velocity;
+        lastGroundedTime = Time.time;
     }
 
-    bool IsGrounded()
+    void OnCollisionEnter(Collision collision)
     {
-        Vector3 origin = transform.position + Vector3.up * 0.1f;
-        return Physics.Raycast(origin, Vector3.down, groundCheckDistance + 0.1f, groundMask, QueryTriggerInteraction.Ignore);
+        if (!IsValidGroundCollision(collision))
+            return;
+
+        lastGroundedTime = Time.time;
+    }
+
+    bool IsValidGroundCollision(Collision collision)
+    {
+        if (((1 << collision.gameObject.layer) & groundMask) == 0)
+            return false;
+
+        foreach (var contact in collision.contacts)
+        {
+            if (contact.normal.y > 0.5f)
+                return true;
+        }
+
+        return false;
     }
 
     void FixedUpdate()
     {
-        Vector2 input = moveAction.ReadValue<Vector2>();
+        if (jumpQueued)
+        {
+            jumpQueued = false;
+            TryJump();
+        }
+
+        Vector2 input = moveAction != null ? moveAction.ReadValue<Vector2>() : Vector2.zero;
         if (input.sqrMagnitude > 1f)
             input.Normalize();
 
@@ -93,6 +129,21 @@ public class PlayeMovement : MonoBehaviour
         velocity.x = direction.x * moveSpeed;
         velocity.z = direction.z * moveSpeed;
         rb.linearVelocity = velocity;
+    }
+
+    void TryJump()
+    {
+        if (!IsGrounded())
+            return;
+
+        Vector3 velocity = rb.linearVelocity;
+        velocity.y = jumpForce;
+        rb.linearVelocity = velocity;
+    }
+
+    bool IsGrounded()
+    {
+        return Time.time - lastGroundedTime <= groundedRememberTime;
     }
 
     Vector3 GetMoveDirection(Vector2 input)

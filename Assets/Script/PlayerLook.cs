@@ -12,6 +12,7 @@ public class PlayerLook : MonoBehaviour
 
     PlayerInputActions inputProvider;
     InputAction lookAction;
+    bool usesSharedInputAsset;
     float pitch;
 
     void Awake()
@@ -30,9 +31,15 @@ public class PlayerLook : MonoBehaviour
 
         var map = inputProvider.PlayerMap;
         if (map != null)
+        {
+            usesSharedInputAsset = true;
             lookAction = map.FindAction("Look");
+        }
         else
+        {
+            usesSharedInputAsset = false;
             lookAction = CreateFallbackLookAction();
+        }
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -40,12 +47,14 @@ public class PlayerLook : MonoBehaviour
 
     void OnEnable()
     {
-        lookAction?.Enable();
+        if (!usesSharedInputAsset)
+            lookAction?.Enable();
     }
 
     void OnDisable()
     {
-        lookAction?.Disable();
+        if (!usesSharedInputAsset)
+            lookAction?.Disable();
     }
 
     void Update()
