@@ -2,35 +2,75 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(PlayerInputActions))]
 public class PlayeMovement : MonoBehaviour
 {
-    [SerializeField] InputActionAsset inputActions;
     [SerializeField] float moveSpeed = 6f;
-    [SerializeField] float rotationSpeed = 12f;
+    [SerializeField] float jumpForce = 7f;
+    [SerializeField] float groundCheckDistance = 0.25f;
+    [SerializeField] LayerMask groundMask = ~0;
     [SerializeField] bool cameraRelative = true;
 
     Rigidbody rb;
+    PlayerInputActions inputProvider;
     InputAction moveAction;
+    InputAction jumpAction;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
         rb.constraints |= RigidbodyConstraints.FreezeRotation;
 
-        if (inputActions != null)
-            moveAction = inputActions.FindActionMap("Player").FindAction("Move");
+        inputProvider = GetComponent<PlayerInputActions>();
+        var map = inputProvider.PlayerMap;
+
+        if (map != null)
+        {
+            moveAction = map.FindAction("Move");
+            jumpAction = map.FindAction("Jump");
+        }
         else
+        {
             moveAction = CreateFallbackMoveAction();
+            jumpAction = CreateFallbackJumpAction();
+        }
+
+        if (jumpAction != null)
+            jumpAction.performed += OnJump;
+    }
+
+    void OnDestroy()
+    {
+        if (jumpAction != null)
+            jumpAction.performed -= OnJump;
     }
 
     void OnEnable()
     {
         moveAction?.Enable();
+        jumpAction?.Enable();
     }
 
     void OnDisable()
     {
         moveAction?.Disable();
+        jumpAction?.Disable();
+    }
+
+    void OnJump(InputAction.CallbackContext _)
+    {
+        if (!IsGrounded())
+            return;
+
+        Vector3 velocity = rb.linearVelocity;
+        velocity.y = jumpForce;
+        rb.linearVelocity = velocity;
+    }
+
+    bool IsGrounded()
+    {
+        Vector3 origin = transform.position + Vector3.up * 0.1f;
+        return Physics.Raycast(origin, Vector3.down, groundCheckDistance + 0.1f, groundMask, QueryTriggerInteraction.Ignore);
     }
 
     void FixedUpdate()
@@ -53,9 +93,6 @@ public class PlayeMovement : MonoBehaviour
         velocity.x = direction.x * moveSpeed;
         velocity.z = direction.z * moveSpeed;
         rb.linearVelocity = velocity;
-
-        Quaternion targetRotation = Quaternion.LookRotation(direction);
-        rb.MoveRotation(Quaternion.Slerp(rb.rotation, targetRotation, rotationSpeed * Time.fixedDeltaTime));
     }
 
     Vector3 GetMoveDirection(Vector2 input)
@@ -94,5 +131,12 @@ public class PlayeMovement : MonoBehaviour
 
         move.AddBinding("<Gamepad>/leftStick");
         return move;
+    }
+
+    static InputAction CreateFallbackJumpAction()
+    {
+        var jump = new InputAction("Jump", InputActionType.Button);
+        jump.AddBinding("<Keyboard>/space");
+        return jump;
     }
 }
